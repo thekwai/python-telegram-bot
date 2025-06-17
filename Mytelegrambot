@@ -1,0 +1,125 @@
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Updater, CommandHandler, CallbackQueryHandler, 
+    CallbackContext, MessageHandler, Filters
+)
+
+# Enable logging
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(name)
+
+# Categories Structure
+CATEGORIES = {
+    "travel": {
+        "name": "🚕 ခရီးသွားလာရေး",
+        "sub": {
+            "taxi": "တက္ကစီ",
+            "bus": "ဘတ်စ်ကား",
+            "train": "ရထား",
+            "bike": "စက်ဘီးငှားရမ်းရန်"
+        }
+    },
+    "food": {
+        "name": "🍔 စားသောက်ကုန်",
+        "sub": {
+            "restaurant": "စားသောက်ဆိုင်",
+            "coffee": "ကော်ဖီဆိုင်",
+            "delivery": "အပြင်အပို့ဝန်ဆောင်မှု"
+        }
+    },
+    "entertainment": {
+        "name": "🎉 ဖျော်ဖြေရေး",
+        "sub": {
+            "cinema": "ရုပ်ရှင်ရုံ",
+            "events": "ပွဲလမ်းများ",
+            "culture": "ယဉ်ကျေးမှုနေရာများ"
+        }
+    },
+    "health": {
+        "name": "🏥 ကျန်းမာရေး",
+        "sub": {
+            "hospital": "ဆေးရုံ",
+            "clinic": "ဆေးခန်း",
+            "pharmacy": "ဆေးဆိုင်"
+        }
+    }
+}
+
+# Keyboard Generators
+def main_menu_keyboard():
+    keyboard = []
+    row = []
+    for i, (key, cat) in enumerate(CATEGORIES.items()):
+        row.append(InlineKeyboardButton(cat["name"], callback_data=f"cat_{key}"))
+        if (i + 1) % 2 == 0:  # 2 buttons per row
+            keyboard.append(row)
+            row = []
+    if row:  # Add remaining buttons
+        keyboard.append(row)
+    keyboard.append([InlineKeyboardButton("📍 နီးစပ်ရာနေရာရှာရန်", request_location=True)])
+    return InlineKeyboardMarkup(keyboard)
+
+def subcategory_keyboard(category):
+    keyboard = []
+    for key, name in CATEGORIES[category]["sub"].items():
+        keyboard.append([InlineKeyboardButton(name, callback_data=f"sub_{key}")])
+    keyboard.append([InlineKeyboardButton("⬅️ နောက်သို့", callback_data="back")])
+    return InlineKeyboardMarkup(keyboard)
+
+# Handlers
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(
+        "မြို့ပြအကူအညီပေးဘော့မှ ကြိုဆိုပါသည်!\n"
+        "လိုအပ်သော ဝန်ဆောင်မှုကို ရွေးချယ်ပါ:",
+        reply_markup=main_menu_keyboard()
+    )
+
+def button_click(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    query.answer()
+    data = query.data
+
+    if data.startswith("cat_"):
+        category = data.split("_")[1]
+        query.edit_message_text(
+            text=f"{CATEGORIES[category]['name']} - ဝန်ဆောင်မှုများ:",
+            reply_markup=subcategory_keyboard(category)
+        )
+    elif data.startswith("sub_"):
+        subcategory = data.split("_")[1]
+        # Implement your service logic here
+        query.edit_message_text(
+            text=f"✅ ရွေးချယ်ထားသော ဝန်ဆောင်မှု: {subcategory}\n\n"
+            "🔍 ရှာဖွေနေပါသည်... (လက်တွေ့တွင် database ချိတ်ဆက်မည်)"
+        )
+    elif data == "back":
+        query.edit_message_text(
+            text="မူလမီနူးသို့ ပြန်လာပြီ",
+            reply_markup=main_menu_keyboard()
+        )
+
+def location_handler(update: Update, context: CallbackContext) -> None:
+    user_location = update.message.location
+    # Implement location-based services here
+    update.message.reply_text(
+        f"📍 တည်နေရာ လက်ခံရရှိပါသည်!\n"
+        f"လတ္တီကျု: {user_location.latitude}, လောင်ဂျီကျု: {user_location.longitude}\n\n"
+        "နီးစပ်ရာ ဝန်ဆောင်မှုများ ရှာဖွေပေးပါမည်...",
+        reply_markup=main_menu_keyboard()
+    )
+
+def main() -> None:
+    updater = Updater("8042214057:AAHzzTZ2eHaetcVPY-hvjtKrPuiKNYhjzzo", use_context=True)
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CallbackQueryHandler(button_click))
+    dispatcher.add_handler(MessageHandler(Filters.location, location_handler))
+
+    updater.start_polling()
+    updater.idle()
+
+if name == 'main':
+    main()
+
